@@ -76,7 +76,7 @@
   .stage-bg::after{content:"";position:absolute;inset:0;
     background:linear-gradient(180deg, rgba(18,23,44,.18) 0%, rgba(18,23,44,.02) 40%, rgba(18,23,44,.55) 78%, rgba(18,23,44,.85) 100%);}
   .stage-bg.bg-exam img{filter:saturate(.7) brightness(.82) hue-rotate(-6deg);}
-  .stage-char{position:absolute;top:8px;bottom:212px;left:50%;transform:translateX(-50%);
+  .stage-char{position:absolute;top:8px;bottom:130px;left:50%;transform:translateX(-50%);
     width:92%;
     object-fit:contain;object-position:top;filter:drop-shadow(0 12px 20px rgba(0,0,0,.4));
     animation:charIn .35s ease;}
@@ -709,6 +709,18 @@ function screenRouteIntro(){
   document.getElementById('go').onclick = ()=>{ S.screen='scene'; render(); };
 }
 
+function resizeStageChar(){
+  const stage = document.querySelector('.stage');
+  const charEl = document.querySelector('.stage-char');
+  if(!stage || !charEl) return;
+  const boxEl = stage.querySelector('.vn-textbox, .vn-choices, .vn-advance');
+  const stageH = stage.getBoundingClientRect().height;
+  const boxH = boxEl ? boxEl.getBoundingClientRect().height : 100;
+  const reserved = Math.min(boxH + 22, stageH - 60); // leave at least 60px for character
+  charEl.style.bottom = Math.max(reserved, 70) + 'px';
+}
+window.addEventListener('resize', resizeStageChar);
+
 function screenScene(){
   const r = ROUTES[S.route];
   const scene = r.scenes[S.sceneIdx];
@@ -785,6 +797,8 @@ function screenScene(){
       ${box}
     </div>
   </div>`;
+
+  resizeStageChar();
 
   if(S.phase === 'lines' || S.phase === 'response'){
     // typewriter effect
