@@ -163,6 +163,7 @@
 <div id="app"></div>
 <audio id="bgm" loop preload="auto"></audio>
 <button id="soundToggle" class="sound-toggle" aria-label="사운드 켜기/끄기">🔊</button>
+<button id="restartTop" class="restart-top" aria-label="처음으로">↺ 처음으로</button>
 
 <style>
   .sound-toggle{
@@ -172,6 +173,15 @@
     color:#FAF3E4; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   }
   .sound-toggle:active{transform:scale(.94);}
+  .restart-top{
+    position:fixed; top:14px; left:14px; z-index:50;
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:600;
+    padding:9px 13px; border-radius:20px; border:1.5px solid rgba(250,243,228,.35);
+    background:rgba(18,23,44,.55); backdrop-filter:blur(4px);
+    color:#FAF3E4; cursor:pointer; display:none;
+  }
+  .restart-top:active{transform:scale(.96);}
+  .restart-top.show{display:block;}
 </style>
 
 <script>
@@ -506,11 +516,25 @@ document.getElementById('soundToggle').onclick = ()=>{
   updateSoundUI();
   saveState();
 };
+document.getElementById('restartTop').onclick = ()=>{
+  if(S.screen === 'title') return;
+  const ok = window.confirm('처음 화면으로 돌아갈까요? 지금까지의 진행 상황은 사라져요.');
+  if(ok){ clearState(); resetAll(); render(); }
+};
+function updateRestartUI(){
+  const btn = document.getElementById('restartTop');
+  if(!btn) return;
+  if(S.screen === 'title') btn.classList.remove('show');
+  else btn.classList.add('show');
+}
 
 function npcKey(){ return S.gender === '남' ? 'girl' : 'boy'; } // NPC gender opposite of player
 function fill(str){
   const op = S.gender === '여' ? '남편' : '아내';
   return (str||'').replaceAll('{pname}', S.name || '나').replaceAll('{name}', S.name ? currentCharName() : '').replaceAll('{op}', op);
+}
+function stripParens(str){
+  return (str||'').replace(/\s*[\(（][^)）]*[\)）]\s*/g, ' ').replace(/\s{2,}/g,' ').trim();
 }
 function currentCharName(){ return S.route ? ROUTES[S.route].name : ''; }
 
@@ -560,13 +584,18 @@ function screenName(){
     <div class="eyebrow">STEP 1</div>
     <h1 class="title" style="font-size:28px;">이름을 입력해주세요!</h1>
     <input class="textfield" id="nameInput" placeholder="예) 지유" maxlength="8" value="${S.name || ''}" autofocus>
+    <p id="nameWarn" style="color:var(--coral);font-size:12.5px;margin:-10px 0 14px;display:none;">이름을 입력해주세요!</p>
     <div class="btn-row"><button class="btn btn-primary" id="next">다음</button></div>
   </div>`;
   const inp = document.getElementById('nameInput');
+  const warn = document.getElementById('nameWarn');
   document.getElementById('next').onclick = ()=>{
-    S.name = inp.value.trim() || '지유';
+    const v = inp.value.trim();
+    if(!v){ warn.style.display = 'block'; inp.focus(); return; }
+    S.name = v;
     S.screen='gender'; render();
   };
+  inp.addEventListener('input', ()=>{ warn.style.display = 'none'; });
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ document.getElementById('next').click(); }});
 }
 
@@ -716,7 +745,7 @@ function screenScene(){
 
   if(S.phase === 'lines' || S.phase === 'response'){
     // typewriter effect
-    const fullText = fill(currentLine.s);
+    const fullText = stripParens(fill(currentLine.s));
     const lineEl = document.getElementById('vnLine');
     const tapEl = document.getElementById('tap');
     let ti = 0, done = false, timer = null;
@@ -781,17 +810,24 @@ function screenEnding(){
   }
 
   let heroImg = null;
+  let heroIsFallback = false;
   if(r.hasImages){
-    if(key === 'happy') heroImg = imgFor(r.key, 'endingHappy');
-    else if(key === 'bad') heroImg = imgFor(r.key, 'endingBad');
-    else heroImg = imgFor(r.key, 'neutral');
+    if(key === 'happy'){
+      heroImg = imgFor(r.key, 'endingHappy');
+    } else if(key === 'bad'){
+      const dedicated = IMG[r.key] && IMG[r.key][npcKey()] && IMG[r.key][npcKey()].endingBad;
+      heroImg = dedicated || imgFor(r.key, 'serious') || imgFor(r.key, 'neutral');
+      heroIsFallback = !dedicated;
+    } else {
+      heroImg = imgFor(r.key, 'neutral');
+    }
   }
 
   app.innerHTML = `
   <div class="screen">
     <div class="eyebrow">${r.tag} · ${r.name}의 이야기 — 결과</div>
     ${gaugeHTML()}
-    ${heroImg ? `<div class="ending-hero"><img src="${heroImg}"></div>` : `<div class="ending-hero-none">${r.name}<br><span style="font-size:13px;opacity:.7;">(이미지 준비 중)</span></div>`}
+    ${heroImg ? `<div class="ending-hero"><img src="${heroImg}" style="${heroIsFallback && key==='bad' ? 'filter:grayscale(.55) brightness(.62) contrast(1.05);' : ''}">${heroIsFallback && key==='bad' ? '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,23,44,0) 55%,rgba(18,23,44,.55));"></div>' : ''}</div>` : `<div class="ending-hero-none">${r.name}<br><span style="font-size:13px;opacity:.7;">(이미지 준비 중)</span></div>`}
     <div class="ending-badge ${cls}">${key.toUpperCase()} ENDING</div>
     <h1 class="ending-title">${e.title}</h1>
     <p class="ending-text">${fill(e.text)}</p>
@@ -817,6 +853,7 @@ function render(){
     case 'ending': screenEnding(); break;
   }
   updateSoundUI();
+  updateRestartUI();
   saveState();
 }
 if(!loadState()){ resetAll(); }
