@@ -571,9 +571,30 @@ function updateRestartUI(){
 }
 
 function npcKey(){ return S.gender === '남' ? 'girl' : 'boy'; } // NPC gender opposite of player
+function hasJong(word){
+  if(!word) return false;
+  const ch = word.charCodeAt(word.length-1);
+  if(ch < 0xAC00 || ch > 0xD7A3) return false;
+  return ((ch - 0xAC00) % 28) !== 0;
+}
+function applyJosa(text){
+  // Fix particles right after substituted names: 아/야, 은/는, 이/가, 과/와
+  return text.replace(/([가-힣A-Za-z0-9]+)\u0001([아은이과])/g, (m, word, josa)=>{
+    const jong = hasJong(word);
+    if(josa === '아') return word + (jong ? '아' : '야');
+    if(josa === '은') return word + (jong ? '은' : '는');
+    if(josa === '이') return word + (jong ? '이' : '가');
+    if(josa === '과') return word + (jong ? '과' : '와');
+    return word + josa;
+  }).replaceAll('\u0001','');
+}
 function fill(str){
   const op = S.gender === '여' ? '남편' : '아내';
-  return (str||'').replaceAll('{pname}', S.name || '나').replaceAll('{name}', S.name ? currentCharName() : '').replaceAll('{op}', op);
+  let out = (str||'')
+    .replaceAll('{pname}', (S.name || '나') + '\u0001')
+    .replaceAll('{name}', (S.name ? currentCharName() : '') + '\u0001')
+    .replaceAll('{op}', op);
+  return applyJosa(out);
 }
 function stripParens(str){
   return (str||'').replace(/\s*[\(（][^)）]*[\)）]\s*/g, ' ').replace(/\s{2,}/g,' ').trim();
